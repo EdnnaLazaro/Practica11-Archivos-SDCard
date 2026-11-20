@@ -52,8 +52,11 @@ import java.util.Locale
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReproductorScreen() {
+
+    // Estado de navegación entre las secciones de la aplicación
     var selectedTab by remember { mutableIntStateOf(0) }
 
+    // Configuración del tema y los colores de la interfaz
     MaterialTheme(
         colorScheme = lightColorScheme(
             primary = Color(0xFF7045A1),
@@ -72,6 +75,8 @@ fun ReproductorScreen() {
             }
         ) { paddingValues ->
             Column(modifier = Modifier.padding(paddingValues)) {
+
+                // Pestañas de navegación entre reproductor y archivos de texto
                 TabRow(selectedTabIndex = selectedTab) {
                     Tab(
                         selected = selectedTab == 0,
@@ -84,6 +89,8 @@ fun ReproductorScreen() {
                         text = { Text("Archivos de texto") }
                     )
                 }
+
+                // Visualización de la sección seleccionada
                 when (selectedTab) {
                     0 -> ReproductorContenido()
                     else -> ArchivoScreen()
@@ -96,19 +103,26 @@ fun ReproductorScreen() {
 @Composable
 private fun ReproductorContenido() {
     val context = LocalContext.current
+
+    // Estados del archivo de audio y del reproductor
     var audioUri by remember { mutableStateOf<Uri?>(null) }
     var mediaPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
     var isPlaying by remember { mutableStateOf(false) }
-    var audioName by remember { mutableStateOf("Ningún archivo seleccionado") }
+    var audioName by remember {
+        mutableStateOf("Ningún archivo seleccionado")
+    }
     var status by remember { mutableStateOf("") }
     var playbackState by remember { mutableStateOf("Sin reproducción") }
     var positionMs by remember { mutableIntStateOf(0) }
     var durationMs by remember { mutableIntStateOf(0) }
 
+    // Selección de archivos de audio mediante el explorador de Android
     val selectorAudio = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
         if (uri != null) {
+
+            // Liberación del reproductor anterior y reinicio de los estados
             mediaPlayer?.release()
             mediaPlayer = null
             isPlaying = false
@@ -117,21 +131,27 @@ private fun ReproductorContenido() {
             positionMs = 0
             durationMs = 0
             playbackState = "Sin reproducción"
+
+            // Carga e inicio de reproducción del archivo seleccionado
             runCatching {
                 MediaPlayer.create(context, uri)
                     ?: throw IllegalStateException("Archivo incompatible")
             }.onSuccess { player ->
                 mediaPlayer = player
                 durationMs = player.duration.coerceAtLeast(0)
+
+                // Actualización del estado al finalizar la pista
                 player.setOnCompletionListener {
                     isPlaying = false
                     positionMs = durationMs
                     playbackState = "Finalizado"
                 }
+
                 player.start()
                 isPlaying = true
                 playbackState = "Reproduciendo"
                 status = "Audio cargado correctamente"
+
             }.onFailure {
                 audioUri = null
                 playbackState = "Sin reproducción"
@@ -140,15 +160,20 @@ private fun ReproductorContenido() {
         }
     }
 
+    // Actualización periódica del progreso durante la reproducción
     LaunchedEffect(mediaPlayer, isPlaying) {
         while (isPlaying) {
             val player = mediaPlayer ?: break
-            positionMs = runCatching { player.currentPosition.coerceIn(0, durationMs) }
-                .getOrDefault(positionMs)
+
+            positionMs = runCatching {
+                player.currentPosition.coerceIn(0, durationMs)
+            }.getOrDefault(positionMs)
+
             delay(250)
         }
     }
 
+    // Liberación de recursos al cerrar la pantalla del reproductor
     DisposableEffect(Unit) {
         onDispose {
             mediaPlayer?.release()
@@ -156,6 +181,7 @@ private fun ReproductorContenido() {
         }
     }
 
+    // Interfaz principal del reproductor MP3
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -163,20 +189,25 @@ private fun ReproductorContenido() {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
+        // Nombre del archivo de audio seleccionado
         Text(
-            text = if (audioUri == null) "Ningún archivo seleccionado" else audioName,
+            text = if (audioUri == null)
+                "Ningún archivo seleccionado"
+            else audioName,
             style = MaterialTheme.typography.bodyLarge,
             textAlign = TextAlign.Center
         )
 
         Spacer(modifier = Modifier.height(24.dp))
 
+        // Botón para seleccionar archivos de audio del dispositivo
         Button(onClick = { selectorAudio.launch("audio/*") }) {
             Text("Buscar MP3 en SD/Memoria")
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        // Mensajes de confirmación y errores del reproductor
         if (status.isNotEmpty()) {
             Text(
                 text = status,
@@ -187,11 +218,16 @@ private fun ReproductorContenido() {
 
         Spacer(modifier = Modifier.height(20.dp))
 
+        // Barra de progreso con posibilidad de cambiar la posición del audio
         Slider(
-            value = positionMs.toFloat().coerceIn(0f, durationMs.coerceAtLeast(1).toFloat()),
+            value = positionMs.toFloat().coerceIn(
+                0f,
+                durationMs.coerceAtLeast(1).toFloat()
+            ),
             onValueChange = { value ->
                 mediaPlayer?.let { player ->
                     val target = value.toInt().coerceIn(0, durationMs)
+
                     runCatching {
                         player.seekTo(target)
                         positionMs = target
@@ -203,17 +239,29 @@ private fun ReproductorContenido() {
             modifier = Modifier.fillMaxWidth()
         )
 
+        // Indicadores del tiempo transcurrido y duración total
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text(formatoTiempo(positionMs), style = MaterialTheme.typography.bodySmall)
-            Text(formatoTiempo(durationMs), style = MaterialTheme.typography.bodySmall)
+            Text(
+                formatoTiempo(positionMs),
+                style = MaterialTheme.typography.bodySmall
+            )
+            Text(
+                formatoTiempo(durationMs),
+                style = MaterialTheme.typography.bodySmall
+            )
         }
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        // Controles principales de reproducción, pausa y detención
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+
+            // Reproducción o reanudación desde la posición actual
             FloatingActionButton(
                 onClick = {
                     mediaPlayer?.let { player ->
@@ -223,11 +271,14 @@ private fun ReproductorContenido() {
                                     player.seekTo(0)
                                     positionMs = 0
                                 }
+
                                 player.start()
                                 isPlaying = true
                                 playbackState = "Reproduciendo"
                             }
-                        }.onFailure { status = "No se pudo reproducir el audio" }
+                        }.onFailure {
+                            status = "No se pudo reproducir el audio"
+                        }
                     }
                 }
             ) {
@@ -238,16 +289,22 @@ private fun ReproductorContenido() {
                 )
             }
 
+            // Pausa del audio conservando la posición de reproducción
             FloatingActionButton(
                 onClick = {
                     mediaPlayer?.let { player ->
                         if (isPlaying) {
                             runCatching {
                                 player.pause()
-                                positionMs = player.currentPosition.coerceIn(0, durationMs)
+                                positionMs = player.currentPosition.coerceIn(
+                                    0,
+                                    durationMs
+                                )
                                 isPlaying = false
                                 playbackState = "Pausado"
-                            }.onFailure { status = "No se pudo pausar el audio" }
+                            }.onFailure {
+                                status = "No se pudo pausar el audio"
+                            }
                         }
                     }
                 }
@@ -259,6 +316,7 @@ private fun ReproductorContenido() {
                 )
             }
 
+            // Detención del audio y reinicio de la pista al segundo cero
             FloatingActionButton(
                 onClick = {
                     mediaPlayer?.let { player ->
@@ -268,7 +326,9 @@ private fun ReproductorContenido() {
                             positionMs = 0
                             isPlaying = false
                             playbackState = "Detenido"
-                        }.onFailure { status = "No se pudo detener el audio" }
+                        }.onFailure {
+                            status = "No se pudo detener el audio"
+                        }
                     }
                 }
             ) {
@@ -282,6 +342,7 @@ private fun ReproductorContenido() {
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        // Visualización del estado actual de reproducción
         Text(
             text = playbackState,
             style = MaterialTheme.typography.labelMedium
@@ -289,11 +350,18 @@ private fun ReproductorContenido() {
     }
 }
 
+// Conversión de milisegundos al formato de minutos y segundos
 private fun formatoTiempo(milliseconds: Int): String {
     val seconds = milliseconds.coerceAtLeast(0) / 1000
-    return String.format(Locale.US, "%02d:%02d", seconds / 60, seconds % 60)
+    return String.format(
+        Locale.US,
+        "%02d:%02d",
+        seconds / 60,
+        seconds % 60
+    )
 }
 
+// Obtención del nombre del archivo mediante su identificador URI
 private fun nombreDeArchivo(context: Context, uri: Uri): String {
     return runCatching {
         context.contentResolver.query(
@@ -303,8 +371,15 @@ private fun nombreDeArchivo(context: Context, uri: Uri): String {
             null,
             null
         )?.use { cursor ->
-            val index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-            if (index >= 0 && cursor.moveToFirst()) cursor.getString(index) else null
+            val index = cursor.getColumnIndex(
+                OpenableColumns.DISPLAY_NAME
+            )
+
+            if (index >= 0 && cursor.moveToFirst()) {
+                cursor.getString(index)
+            } else {
+                null
+            }
         }
     }.getOrNull() ?: "Audio seleccionado"
 }
